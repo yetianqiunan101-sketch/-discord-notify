@@ -1,0 +1,4 @@
+from notify import DiscordNotifier
+
+notifier = DiscordNotifier(webhook_url="[https://discord.com/api/webhooks/](https://discord.com/api/webhooks/)...")
+notifier.send("Task finished successfully!")
