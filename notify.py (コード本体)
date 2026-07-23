@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""
+Discord Webhook Notification Utility & CLI
+License: MIT
+"""
+
+import sys
+import os
+import json
+import argparse
+import urllib.request
+import urllib.error
+from typing import Optional, Dict, Any
+
+class DiscordNotifier:
+    """Discord Webhook Wrapper Class"""
+
+    def __init__(self, webhook_url: Optional[str] = None):
+        self.webhook_url = webhook_url or os.getenv("DISCORD_WEBHOOK_URL")
+        if not self.webhook_url:
+            raise ValueError("Webhook URL is required. Set DISCORD_WEBHOOK_URL env or pass to constructor.")
+
+    def send(self, message: str, username: Optional[str] = None, avatar_url: Optional[str] = None, embed: Optional[Dict[str, Any]] = None) -> bool:
+        """Send notification to Discord"""
+        payload: Dict[str, Any] = {"content": message}
+        
+        if username:
+            payload["username"] = username
+        if avatar_url:
+            payload["avatar_url"] = avatar_url
+        if embed:
+            payload["embeds"] = [embed]
+
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            self.webhook_url,
+            data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "DiscordNotifierCLI/1.0"}
+        )
+
+        try:
+            with urllib.request.urlopen(req) as response:
+                return response.status in (200, 204)
+        except urllib.error.HTTPError as e:
+            print(f"Error: HTTP {e.code} - {e.reason}", file=sys.stderr)
+            return False
+        except urllib.error.URLError as e:
+            print(f"Error: {e.reason}", file=sys.stderr)
+            return False
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Send notifications to Discord via Webhook.")
+    parser.add_argument("message", nargs="?", help="Notification message string. If omitted, reads from STDIN.")
+    parser.add_argument("--url", help="Discord Webhook URL (Defaults to DISCORD_WEBHOOK_URL env var)")
+    parser.add_argument("--bot-name", help="Custom bot username")
+    parser.add_argument("--title", help="Title for embed message")
+    parser.add_argument("--color", type=int, default=3447003, help="Decimal color code for embed sidebar (default: Blue)")
+
+    args = parser.parse_args()
+
+    # Read from standard input if message argument is empty
+    message = args.message
+    if not message:
+        if not sys.stdin.isatty():
+            message = sys.stdin.read().strip()
+        else:
+            parser.error("Message is required either as an argument or via standard input (pipe).")
+
+    embed = None
+    if args.title:
+        embed = {
+            "title": args.title,
+            "description": message,
+            "color": args.color
+        }
+        message = ""  # Clear message when using embed
+
+    try:
+        notifier = DiscordNotifier(webhook_url=args.url)
+        success = notifier.send(message=message, username=args.bot_name, embed=embed)
+        if success:
+            sys.exit(0)
+        else:
+            sys.exit(1)
+    except Exception as e:
+        print(f"Failed: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
