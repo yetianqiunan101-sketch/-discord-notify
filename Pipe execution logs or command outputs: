@@ -1,0 +1,3 @@
+cat server.log | python3 notify.py
+# or
+df -h | python3 notify.py --title "Disk Usage Alert" --bot-name "ServerBot"
